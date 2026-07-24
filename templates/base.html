@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- 사이드바 바 -->
+    <!-- 사이드바 -->
     <aside class="sidebar">
         <div class="brand">
             <div class="brand-icon"><i class="fa-solid fa-cubes"></i></div>
@@ -36,6 +36,13 @@
                     <i class="fa-solid fa-cart-shopping"></i> 주문 관리
                 </a>
             </li>
+            {% if current_user and current_user.role == 'admin' %}
+            <li>
+                <a href="/users" class="nav-link {% if active_page == 'users' %}active{% endif %}">
+                    <i class="fa-solid fa-users-gear"></i> 계정 관리 (Admin)
+                </a>
+            </li>
+            {% endif %}
         </ul>
     </aside>
 
@@ -43,8 +50,27 @@
     <div class="main-wrapper">
         <header class="header">
             <div class="header-title">{% block page_title %}대시보드{% endblock %}</div>
-            <div style="font-size:0.85rem; color: var(--text-secondary);">
-                FastAPI + MySQL Server
+            
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                {% if current_user %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    {% if current_user.role == 'admin' %}
+                        <span class="badge badge-completed" style="background: rgba(99,102,241,0.2); color: #818cf8; padding: 0.35rem 0.7rem; font-size: 0.82rem;">
+                            <i class="fa-solid fa-user-shield"></i> {{ current_user.username }} (관리자)
+                        </span>
+                    {% else %}
+                        <span class="badge badge-pending" style="padding: 0.35rem 0.7rem; font-size: 0.82rem;">
+                            <i class="fa-solid fa-user"></i> {{ current_user.username }} (일반 사용자)
+                        </span>
+                    {% endif %}
+                </div>
+
+                <form action="/logout" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.4rem 0.8rem; font-size: 0.82rem;">
+                        <i class="fa-solid fa-right-from-bracket"></i> 로그아웃
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </header>
 

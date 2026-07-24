@@ -5,6 +5,13 @@
 
 {% block content %}
 
+<!-- 일반 사용자 권한 안내 -->
+{% if current_user and current_user.role != 'admin' %}
+<div class="alert alert-warning" style="margin-bottom: 1.25rem;">
+    <i class="fa-solid fa-shield-halved"></i> <strong>일반 사용자 계정:</strong> 주문 내역 조회만 가능합니다. (신규 주문 접수/상태 변경/삭제 권한은 <strong>관리자(Admin)</strong> 전용입니다)
+</div>
+{% endif %}
+
 <!-- 알림 메시지 영역 ("재고가 부족해요" 경고 및 성공 메시지) -->
 {% if error %}
 <div class="alert alert-danger" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
@@ -22,8 +29,8 @@
 </div>
 {% endif %}
 
-<div class="section-grid">
-    <!-- 주문 목록 표 -->
+<div class="section-grid" style="{% if current_user and current_user.role != 'admin' %}grid-template-columns: 1fr;{% endif %}">
+    <!-- 전체 주문 목록 표 -->
     <div class="card">
         <div class="card-title">
             <span><i class="fa-solid fa-receipt"></i> 주문 목록</span>
@@ -38,8 +45,10 @@
                         <th>수량</th>
                         <th>금액</th>
                         <th>상태</th>
-                        <th>상태 변경</th>
+                        {% if current_user and current_user.role == 'admin' %}
+                        <th>주문 상태 변경</th>
                         <th>관리</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -55,7 +64,6 @@
                             {{ order.product.name if order.product else '삭제된 상품' }}
                         </td>
                         <td>{{ order.quantity }}개</td>
-                        <!-- 금액 (가격 x 수량 콤마 표시) -->
                         <td style="font-weight: 600; color: var(--accent-blue);">
                             {% if order.product %}
                                 {{ "{:,}".format(int(order.product.price * order.quantity)) }}원
@@ -64,16 +72,15 @@
                             {% endif %}
                         </td>
                         <td>
-                            <!-- 상태 색상 구분 (대기=회색, 완료=초록, 취소=빨강) -->
-                            {% if order.status == '완료' or order.status == '주문완료' %}
+                            {% if order.status == '완료' or order.status == 'COMPLETED' or order.status == '주문완료' %}
                                 <span class="badge badge-completed">
                                     <i class="fa-solid fa-circle-check"></i> 완료
                                 </span>
-                            {% elif order.status == '대기' %}
+                            {% elif order.status == '대기' or order.status == 'PENDING' %}
                                 <span class="badge badge-pending">
                                     <i class="fa-solid fa-clock"></i> 대기
                                 </span>
-                            {% elif order.status == '취소' %}
+                            {% elif order.status == '취소' or order.status == 'CANCELED' or order.status == 'CANCELLED' %}
                                 <span class="badge badge-canceled">
                                     <i class="fa-solid fa-circle-xmark"></i> 취소
                                 </span>
@@ -81,13 +88,13 @@
                                 <span class="badge badge-pending">{{ order.status }}</span>
                             {% endif %}
                         </td>
+                        {% if current_user and current_user.role == 'admin' %}
                         <td>
-                            <!-- 주문 상태 변경 -->
                             <form action="/orders/{{ order.id }}/status" method="POST" style="display:flex; gap:0.3rem;">
                                 <select name="status" class="form-control" style="padding:0.25rem 0.5rem; font-size:0.85rem; width:auto;">
-                                    <option value="대기" {% if order.status == '대기' %}selected{% endif %}>대기 (회색)</option>
-                                    <option value="완료" {% if order.status == '완료' or order.status == '주문완료' %}selected{% endif %}>완료 (초록)</option>
-                                    <option value="취소" {% if order.status == '취소' %}selected{% endif %}>취소 (빨강)</option>
+                                    <option value="대기" {% if order.status == '대기' or order.status == 'PENDING' %}selected{% endif %}>대기 (회색)</option>
+                                    <option value="완료" {% if order.status == '완료' or order.status == 'COMPLETED' or order.status == '주문완료' %}selected{% endif %}>완료 (초록)</option>
+                                    <option value="취소" {% if order.status == '취소' or order.status == 'CANCELED' or order.status == 'CANCELLED' %}selected{% endif %}>취소 (빨강)</option>
                                 </select>
                                 <button type="submit" class="btn btn-primary btn-sm">변경</button>
                             </form>
@@ -99,11 +106,12 @@
                                 </button>
                             </form>
                         </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-                            등록된 주문이 없습니다. 오른쪽 폼에서 상품을 주문해보세요.
+                        <td colspan="{% if current_user and current_user.role == 'admin' %}8{% else %}6{% endif %}" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            등록된 주문이 없습니다.
                         </td>
                     </tr>
                     {% endfor %}
@@ -112,14 +120,14 @@
         </div>
     </div>
 
-    <!-- 주문하는 칸 (고객 고르기, 상품 고르기, 수량, 주문 버튼) -->
+    <!-- 신규 주문 접수 폼 (관리자 전용) -->
+    {% if current_user and current_user.role == 'admin' %}
     <div class="card">
         <div class="card-title">
             <span><i class="fa-solid fa-cart-plus"></i> 주문하기</span>
         </div>
         {% if customers and products %}
         <form action="/orders" method="POST">
-            <!-- 1. 고객 고르기 -->
             <div class="form-group">
                 <label class="form-label">고객 고르기 *</label>
                 <select name="customer_id" class="form-control" required>
@@ -130,7 +138,6 @@
                 </select>
             </div>
             
-            <!-- 2. 상품 고르기 (남은 재고 표시) -->
             <div class="form-group">
                 <label class="form-label">상품 고르기 *</label>
                 <select name="product_id" class="form-control" required>
@@ -143,13 +150,11 @@
                 </select>
             </div>
 
-            <!-- 3. 수량 넣기 -->
             <div class="form-group">
                 <label class="form-label">수량 *</label>
                 <input type="number" name="quantity" class="form-control" value="1" min="1" required>
             </div>
 
-            <!-- 초기 상태 선택 (기본값: 완료) -->
             <div class="form-group">
                 <label class="form-label">초기 주문 상태</label>
                 <select name="status" class="form-control">
@@ -158,7 +163,6 @@
                 </select>
             </div>
 
-            <!-- 4. "주문" 버튼 -->
             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; font-size: 1rem; padding: 0.75rem;">
                 <i class="fa-solid fa-cart-shopping"></i> 주문
             </button>
@@ -169,5 +173,6 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
 </div>
 {% endblock %}

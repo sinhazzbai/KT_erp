@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}계정 관리 - 미니 ERP{% endblock %}
+{% block page_title %}계정(Users) 관리 [관리자 전용]{% endblock %}
+
+{% block content %}
+
+<!-- 알림 메시지 영역 -->
+{% if error %}
+<div class="alert alert-danger">
+    <i class="fa-solid fa-triangle-exclamation"></i> <strong>오류:</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if msg %}
+<div class="alert alert-success">
+    <i class="fa-solid fa-circle-check"></i> {{ msg }}
+</div>
+{% endif %}
+
+<div class="section-grid">
+    <!-- 계정 목록 테이블 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-users-gear"></i> 등록된 계정 목록</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>아이디</th>
+                        <th>권한</th>
+                        <th>오답 횟수</th>
+                        <th>잠금 상태</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>#{{ user.id }}</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">{{ user.username }}</td>
+                        <td>
+                            {% if user.role == 'admin' %}
+                                <span class="badge badge-completed" style="background: rgba(99,102,241,0.2); color: #818cf8;">
+                                    <i class="fa-solid fa-user-shield"></i> 관리자 (Admin)
+                                </span>
+                            {% else %}
+                                <span class="badge badge-pending">
+                                    <i class="fa-solid fa-user"></i> 일반 사용자 (User)
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.failed_attempts >= 5 %}
+                                <strong style="color: #f87171;">{{ user.failed_attempts }}/5회 (잠김)</strong>
+                            {% else %}
+                                {{ user.failed_attempts }}/5회
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.lockout_until and user.lockout_until > now %}
+                                <span class="badge badge-canceled">
+                                    <i class="fa-solid fa-lock"></i> 1분 잠금 중
+                                </span>
+                            {% else %}
+                                <span class="badge badge-completed"><i class="fa-solid fa-lock-open"></i> 정상</span>
+                            {% endif %}
+                        </td>
+                        <td style="display: flex; gap: 0.3rem;">
+                            <!-- 잠금 해제 버튼 -->
+                            {% if user.failed_attempts > 0 or (user.lockout_until and user.lockout_until > now) %}
+                            <form action="/users/{{ user.id }}/unlock" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm" style="background: rgba(16,185,129,0.2); color:#34d399;" title="잠금 및 오답 횟수 초기화">
+                                    <i class="fa-solid fa-key"></i> 잠금해제
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <!-- 수정 버튼 -->
+                            <button type="button" class="btn btn-primary btn-sm"
+                                onclick="openEditUserModal({{ user.id }}, '{{ user.username }}', '{{ user.role }}')">
+                                <i class="fa-solid fa-pen-to-square"></i> 수정
+                            </button>
+
+                            <!-- 삭제 버튼 (자기 자신 삭제 제외) -->
+                            {% if user.id != current_user.id %}
+                            <form action="/users/{{ user.id }}/delete" method="POST" style="display:inline;" onsubmit="return confirm('정말 이 계정을 삭제하시겠습니까?');">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fa-solid fa-trash"></i> 삭제
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            등록된 계정이 없습니다.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 신규 계정 생성 폼 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-user-plus"></i> 신규 계정 생성</span>
+        </div>
+        <form action="/users" method="POST">
+            <div class="form-group">
+                <label class="form-label">아이디 (Username) *</label>
+                <input type="text" name="username" class="form-control" placeholder="예: manager1" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">비밀번호 (Password) *</label>
+                <input type="password" name="password" class="form-control" placeholder="비밀번호 입력" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">계정 권한 *</label>
+                <select name="role" class="form-control" required>
+                    <option value="user">일반 사용자 (User - 조회 전용)</option>
+                    <option value="admin">관리자 (Admin - 모든 CRUD 및 계정 관리 가능)</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+                <i class="fa-solid fa-check"></i> 계정 생성
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 계정 정보 수정 모달 (팝업) -->
+<div id="editUserModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-user-gear"></i> 계정 정보 수정</h3>
+            <button class="modal-close" onclick="closeEditUserModal()">&times;</button>
+        </div>
+        <form id="editUserForm" method="POST">
+            <div class="form-group">
+                <label class="form-label">아이디</label>
+                <input type="text" id="edit_username" class="form-control" readonly style="opacity:0.7;">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">새 비밀번호 (변경 시에만 입력)</label>
+                <input type="password" name="password" class="form-control" placeholder="비밀번호 미변경 시 비워두세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">계정 권한 *</label>
+                <select id="edit_role" name="role" class="form-control" required>
+                    <option value="user">일반 사용자 (User)</option>
+                    <option value="admin">관리자 (Admin)</option>
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+                <button type="button" class="btn" style="background: var(--border-color);" onclick="closeEditUserModal()">취소</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditUserModal(id, username, role) {
+    document.getElementById('editUserForm').action = '/users/' + id + '/edit';
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_role').value = role;
+    document.getElementById('editUserModal').classList.add('active');
+}
+
+function closeEditUserModal() {
+    document.getElementById('editUserModal').classList.remove('active');
+}
+</script>
+{% endblock %}

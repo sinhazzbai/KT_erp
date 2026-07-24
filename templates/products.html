@@ -5,6 +5,13 @@
 
 {% block content %}
 
+<!-- 일반 사용자 권한 안내 -->
+{% if current_user and current_user.role != 'admin' %}
+<div class="alert alert-warning" style="margin-bottom: 1.25rem;">
+    <i class="fa-solid fa-shield-halved"></i> <strong>일반 사용자 계정:</strong> 상품 및 재고 현황 조회만 가능합니다. (상품 등록/수정/삭제/재고조정 권한은 <strong>관리자(Admin)</strong> 전용입니다)
+</div>
+{% endif %}
+
 <!-- 알림 메시지 영역 (오류/성공 메시지) -->
 {% if error %}
 <div class="alert alert-danger">
@@ -44,7 +51,7 @@
     </div>
 </div>
 
-<div class="section-grid">
+<div class="section-grid" style="{% if current_user and current_user.role != 'admin' %}grid-template-columns: 1fr;{% endif %}">
     <!-- 상품 목록 및 재고 수량 관리 표 -->
     <div class="card">
         <div class="card-title">
@@ -58,8 +65,10 @@
                         <th>상품명</th>
                         <th>가격</th>
                         <th>재고수량</th>
+                        {% if current_user and current_user.role == 'admin' %}
                         <th>재고 조정 (+/-)</th>
                         <th>관리</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -67,7 +76,6 @@
                     <tr {% if product.stock <= 10 %}style="background-color: rgba(244, 63, 94, 0.06);"{% endif %}>
                         <td>#{{ product.id }}</td>
                         <td style="font-weight: 600; color: var(--text-primary);">{{ product.name }}</td>
-                        <!-- 가격 1,000원 콤마 포맷팅 -->
                         <td style="font-weight: 500;">{{ "{:,}".format(int(product.price)) }}원</td>
                         <td>
                             {% if product.stock <= 10 %}
@@ -80,8 +88,9 @@
                                 </span>
                             {% endif %}
                         </td>
+                        {% if current_user and current_user.role == 'admin' %}
                         <td>
-                            <!-- 줄마다 재고 늘리고/줄이는 버튼 -->
+                            <!-- 수량 증가/감소 버튼 -->
                             <div style="display: flex; gap: 0.3rem;">
                                 <form action="/products/{{ product.id }}/stock" method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="decrease">
@@ -100,7 +109,7 @@
                         <td>
                             <div style="display: flex; gap: 0.3rem;">
                                 <button type="button" class="btn btn-primary btn-sm" 
-                                    onclick="openEditModal({{ product.id }}, '{{ product.name }}', {{ product.price }}, {{ product.stock }})">
+                                    onclick="openEditModal({{ product.id }}, '{{ product.name }}', {{ int(product.price) }}, {{ product.stock }})">
                                     <i class="fa-solid fa-pen"></i> 수정
                                 </button>
 
@@ -111,11 +120,12 @@
                                 </form>
                             </div>
                         </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-                            등록된 상품 정보가 없습니다. 오른쪽 폼에서 상품을 등록해보세요.
+                        <td colspan="{% if current_user and current_user.role == 'admin' %}6{% else %}4{% endif %}" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            등록된 상품 정보가 없습니다.
                         </td>
                     </tr>
                     {% endfor %}
@@ -124,7 +134,8 @@
         </div>
     </div>
 
-    <!-- 상품 등록 폼 -->
+    <!-- 상품 등록 폼 (관리자 전용) -->
+    {% if current_user and current_user.role == 'admin' %}
     <div class="card">
         <div class="card-title">
             <span><i class="fa-solid fa-plus-square"></i> 상품 등록</span>
@@ -150,9 +161,11 @@
             </button>
         </form>
     </div>
+    {% endif %}
 </div>
 
-<!-- 상품 정보 수정 모달 (팝업) -->
+<!-- 상품 정보 수정 모달 (관리자 전용) -->
+{% if current_user and current_user.role == 'admin' %}
 <div id="editModal" class="modal-overlay">
     <div class="modal-card">
         <div class="modal-header">
@@ -196,4 +209,5 @@ function closeEditModal() {
     document.getElementById('editModal').classList.remove('active');
 }
 </script>
+{% endif %}
 {% endblock %}

@@ -3,6 +3,19 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from database import Base
 
+class User(Base):
+    """계정(users) 테이블 - 원격 DB 관리자/일반사용자 계정 및 5회 1분 잠금 관리"""
+    __tablename__ = "users"
+
+    id = Column("user_id", Integer, primary_key=True, index=True, autoincrement=True)
+    username = Column("username", String(50), nullable=False, unique=True, index=True, comment="아이디")
+    password_hash = Column("password_hash", String(255), nullable=False, comment="비밀번호 해시")
+    role = Column("role", String(20), nullable=False, default="user", comment="권한 (admin/user)")
+    failed_attempts = Column("failed_attempts", Integer, nullable=False, default=0, comment="실패 횟수")
+    lockout_until = Column("lockout_until", DateTime, nullable=True, comment="잠금 해제 시간")
+    created_at = Column("created_at", DateTime, default=datetime.utcnow)
+
+
 class Customer(Base):
     """고객(customers) 테이블 - STEP 2 DB 스키마 매핑"""
     __tablename__ = "customers"
