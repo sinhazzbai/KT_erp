@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}재고 관리 - 미니 ERP{% endblock %}
+{% block page_title %}재고 관리{% endblock %}
+
+{% block content %}
+
+<!-- 알림 메시지 영역 (오류/성공 메시지) -->
+{% if error %}
+<div class="alert alert-danger">
+    <i class="fa-solid fa-circle-exclamation"></i> <strong>오류:</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if msg %}
+<div class="alert alert-success">
+    <i class="fa-solid fa-circle-check"></i> {{ msg }}
+</div>
+{% endif %}
+
+<!-- 맨 위 요약 바: 재고 부족 상품 O개 -->
+<div class="card" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-left: 4px solid {% if low_stock_count > 0 %}var(--accent-rose){% else %}var(--accent-emerald){% endif %}; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: {% if low_stock_count > 0 %}rgba(244,63,94,0.15){% else %}rgba(16,185,129,0.15){% endif %}; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: {% if low_stock_count > 0 %}var(--accent-rose){% else %}var(--accent-emerald){% endif %};">
+                <i class="fa-solid fa-boxes-stacked"></i>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">전체 재고 상태 요약</div>
+                <div style="font-size: 1.2rem; font-weight: 700; margin-top: 0.1rem;">
+                    재고 부족 상품 <span style="color: {% if low_stock_count > 0 %}var(--accent-rose){% else %}var(--accent-emerald){% endif %}; font-size: 1.3rem;">{{ low_stock_count }}</span>개
+                </div>
+            </div>
+        </div>
+        {% if low_stock_count > 0 %}
+        <span class="badge badge-canceled" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+            <i class="fa-solid fa-triangle-exclamation"></i> 즉시 재고 보충 필요
+        </span>
+        {% else %}
+        <span class="badge badge-completed" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+            <i class="fa-solid fa-circle-check"></i> 모든 상품 재고 원활
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section-grid">
+    <!-- 상품 목록 및 재고 수량 관리 표 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-list-check"></i> 상품 목록 및 재고 표</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>상품명</th>
+                        <th>가격</th>
+                        <th>재고수량</th>
+                        <th>재고 조정 (+/-)</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr {% if product.stock <= 10 %}style="background-color: rgba(244, 63, 94, 0.06);"{% endif %}>
+                        <td>#{{ product.id }}</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">{{ product.name }}</td>
+                        <!-- 가격 1,000원 콤마 포맷팅 -->
+                        <td style="font-weight: 500;">{{ "{:,}".format(int(product.price)) }}원</td>
+                        <td>
+                            {% if product.stock <= 10 %}
+                                <span style="color: #f87171; font-weight: 700; background: rgba(244, 63, 94, 0.15); padding: 0.25rem 0.5rem; border-radius: 6px; display: inline-block;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ product.stock }}개 (재고 부족)
+                                </span>
+                            {% else %}
+                                <span style="color: #34d399; font-weight: 600;">
+                                    {{ product.stock }}개
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <!-- 줄마다 재고 늘리고/줄이는 버튼 -->
+                            <div style="display: flex; gap: 0.3rem;">
+                                <form action="/products/{{ product.id }}/stock" method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="decrease">
+                                    <button type="submit" class="btn btn-sm" style="background: rgba(244,63,94,0.2); color:#f87171; font-weight:bold; width:30px;" title="재고 1개 줄이기">
+                                        -
+                                    </button>
+                                </form>
+                                <form action="/products/{{ product.id }}/stock" method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="increase">
+                                    <button type="submit" class="btn btn-sm" style="background: rgba(16,185,129,0.2); color:#34d399; font-weight:bold; width:30px;" title="재고 1개 늘리기">
+                                        +
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.3rem;">
+                                <button type="button" class="btn btn-primary btn-sm" 
+                                    onclick="openEditModal({{ product.id }}, '{{ product.name }}', {{ product.price }}, {{ product.stock }})">
+                                    <i class="fa-solid fa-pen"></i> 수정
+                                </button>
+
+                                <form action="/products/{{ product.id }}/delete" method="POST" style="display:inline;" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="fa-solid fa-trash"></i> 삭제
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            등록된 상품 정보가 없습니다. 오른쪽 폼에서 상품을 등록해보세요.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 상품 등록 폼 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-plus-square"></i> 상품 등록</span>
+        </div>
+        <form action="/products" method="POST">
+            <div class="form-group">
+                <label class="form-label">상품명 *</label>
+                <input type="text" name="name" class="form-control" placeholder="예: 무선 키보드" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">가격 (원) *</label>
+                <input type="number" name="price" class="form-control" placeholder="35000" min="0" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">재고수량 (개) *</label>
+                <input type="number" name="stock" class="form-control" placeholder="20" min="0" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+                <i class="fa-solid fa-plus"></i> 등록
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 상품 정보 수정 모달 (팝업) -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-pen-to-square"></i> 상품 정보 수정</h3>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editForm" method="POST">
+            <div class="form-group">
+                <label class="form-label">상품명 *</label>
+                <input type="text" id="edit_name" name="name" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">가격 (원) *</label>
+                <input type="number" id="edit_price" name="price" class="form-control" min="0" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">재고수량 (개) *</label>
+                <input type="number" id="edit_stock" name="stock" class="form-control" min="0" required>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+                <button type="button" class="btn" style="background: var(--border-color);" onclick="closeEditModal()">취소</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, name, price, stock) {
+    document.getElementById('editForm').action = '/products/' + id + '/edit';
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_price').value = price;
+    document.getElementById('edit_stock').value = stock;
+    document.getElementById('editModal').classList.add('active');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+}
+</script>
+{% endblock %}

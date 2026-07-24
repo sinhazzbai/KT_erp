@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}ERP 현황 대시보드 - 미니 ERP{% endblock %}
+{% block page_title %}ERP 현황 대시보드{% endblock %}
+
+{% block content %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- 맨 위 메인 타이틀 -->
+<h1 style="font-size: 1.75rem; font-weight: 800; color: #f8fafc; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.65rem;">
+    <i class="fa-solid fa-gauge-high" style="color: var(--accent-blue);"></i> ERP 현황 대시보드
+</h1>
+
+{% if not db_connected %}
+<div class="alert alert-warning">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <strong>DB 연결 확인 필요:</strong> MySQL 데이터베이스가 실행 중이지 않거나 `.env` 접속 정보가 바르지 않을 수 있습니다.
+</div>
+{% endif %}
+
+<!-- 1. 위쪽 요약 카드 4개 (크고 굵은 숫자 & 파란색 계열 디자인) -->
+<div class="grid-stats">
+    <!-- 총매출 카드 -->
+    <div class="stat-card" style="border-top: 3px solid #38bdf8;">
+        <div>
+            <div class="stat-label" style="font-size: 0.9rem; font-weight: 500;">총 매출 (완료 주문)</div>
+            <div class="stat-value" style="color: #38bdf8;">{{ "{:,}".format(total_revenue) }}원</div>
+        </div>
+        <div class="stat-icon blue">
+            <i class="fa-solid fa-coins"></i>
+        </div>
+    </div>
+    
+    <!-- 총 주문건수 카드 -->
+    <div class="stat-card" style="border-top: 3px solid #0284c7;">
+        <div>
+            <div class="stat-label" style="font-size: 0.9rem; font-weight: 500;">총 주문 건수 (취소 제외)</div>
+            <div class="stat-value" style="color: #60a5fa;">{{ "{:,}".format(total_order_count) }}건</div>
+        </div>
+        <div class="stat-icon blue" style="background: rgba(2, 132, 199, 0.15); color: #38bdf8;">
+            <i class="fa-solid fa-cart-shopping"></i>
+        </div>
+    </div>
+
+    <!-- 총 고객수 카드 -->
+    <div class="stat-card" style="border-top: 3px solid #6366f1;">
+        <div>
+            <div class="stat-label" style="font-size: 0.9rem; font-weight: 500;">총 고객 수</div>
+            <div class="stat-value" style="color: #818cf8;">{{ "{:,}".format(total_customer_count) }}명</div>
+        </div>
+        <div class="stat-icon blue" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-user-group"></i>
+        </div>
+    </div>
+    
+    <!-- 재고부족 상품수 카드 -->
+    <div class="stat-card" style="border-top: 3px solid {% if low_stock_count > 0 %}#f43f5e{% else %}#38bdf8{% endif %};">
+        <div>
+            <div class="stat-label" style="font-size: 0.9rem; font-weight: 500;">재고 부족 상품 (10개 이하)</div>
+            <div class="stat-value" style="color: {% if low_stock_count > 0 %}#f87171{% else %}#38bdf8{% endif %};">
+                {{ "{:,}".format(low_stock_count) }}개
+            </div>
+        </div>
+        <div class="stat-icon blue" style="{% if low_stock_count > 0 %}background: rgba(244,63,94,0.15); color: #f87171;{% else %}background: rgba(56,189,248,0.15); color: #38bdf8;{% endif %}">
+            <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+    </div>
+</div>
+
+<!-- 2. 차트 영역 (파란색 계열 통일) -->
+<div class="section-grid" style="margin-bottom: 1.5rem;">
+    <!-- 2-1. 날짜별 매출 추이 (꺾은선 그래프) -->
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-title">
+            <span><i class="fa-solid fa-chart-line" style="color: #38bdf8;"></i> 날짜별 매출 추이</span>
+        </div>
+        <div style="position: relative; height: 280px; width: 100%;">
+            <canvas id="salesLineChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="section-grid" style="margin-bottom: 1.5rem;">
+    <!-- 2-2. 많이 팔린 상품 TOP 5 (막대 그래프) -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-chart-simple" style="color: #60a5fa;"></i> 많이 팔린 상품 TOP 5</span>
+        </div>
+        <div style="position: relative; height: 260px; width: 100%;">
+            <canvas id="top5BarChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 2-3. 주문 상태 비율 (도넛 그래프) -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-chart-pie" style="color: #818cf8;"></i> 주문 상태 비율</span>
+        </div>
+        <div style="position: relative; height: 260px; width: 100%; display: flex; align-items: center; justify-content: center;">
+            <canvas id="statusDoughnutChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- 3. 하단 영역: 재고 부족 상품 작은 표 & 최근 주문 현황 -->
+<div class="section-grid">
+    <!-- 재고가 부족한 상품 작은 표 (10개 이하) -->
+    <div class="card">
+        <div class="card-title" style="color: #f87171;">
+            <span><i class="fa-solid fa-triangle-exclamation"></i> 재고 부족 상품 목록 (10개 이하)</span>
+            <a href="/products" style="font-size:0.85rem; color: #f87171; text-decoration:none;">재고 관리 &rarr;</a>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>상품명</th>
+                        <th>가격</th>
+                        <th>재고수량</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in low_stock_products %}
+                    <tr style="background-color: rgba(244, 63, 94, 0.05);">
+                        <td>#{{ p.id }}</td>
+                        <td style="font-weight: 600;">{{ p.name }}</td>
+                        <td>{{ "{:,}".format(int(p.price)) }}원</td>
+                        <td>
+                            <span class="badge badge-canceled">
+                                ⚠️ {{ p.stock }}개 (부족)
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">
+                            모든 상품의 재고가 충분합니다 (부족 상품 0개).
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 최근 주문 현황 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-clock-rotate-left" style="color: #38bdf8;"></i> 최근 주문 현황</span>
+            <a href="/orders" style="font-size:0.85rem; color: #38bdf8; text-decoration:none;">전체보기 &rarr;</a>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>주문번호</th>
+                        <th>고객명</th>
+                        <th>상품명</th>
+                        <th>수량</th>
+                        <th>상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.customer.name if order.customer else '-' }}</td>
+                        <td>{{ order.product.name if order.product else '-' }}</td>
+                        <td>{{ order.quantity }}개</td>
+                        <td>
+                            {% if order.status == '완료' or order.status == 'COMPLETED' or order.status == '주문완료' %}
+                                <span class="badge badge-completed">완료</span>
+                            {% elif order.status == '대기' or order.status == 'PENDING' %}
+                                <span class="badge badge-pending">대기</span>
+                            {% elif order.status == '취소' or order.status == 'CANCELED' %}
+                                <span class="badge badge-canceled">취소</span>
+                            {% else %}
+                                <span class="badge badge-pending">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">
+                            주문 데이터가 없습니다.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js 데이터 준비 및 스크립트 실행 (파란색 계열 파렛트) -->
+<script>
+// 1. 날짜별 매출 추이 (꺾은선 그래프 - 블루 그래디언트 스타일)
+const salesDates = [{% for item in sales_by_date %}"{{ item.date }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+const salesRevenues = [{% for item in sales_by_date %}{{ item.revenue }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+const ctxLine = document.getElementById('salesLineChart').getContext('2d');
+new Chart(ctxLine, {
+    type: 'line',
+    data: {
+        labels: salesDates,
+        datasets: [{
+            label: '일별 매출액 (원)',
+            data: salesRevenues,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#38bdf8',
+            pointBorderColor: '#ffffff',
+            pointRadius: 5
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return ' 일별 매출: ' + context.parsed.y.toLocaleString() + '원';
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.4)' } },
+            y: { 
+                ticks: { 
+                    color: '#94a3b8',
+                    callback: function(value) { return value.toLocaleString() + '원'; }
+                }, 
+                grid: { color: 'rgba(51, 65, 85, 0.4)' } 
+            }
+        }
+    }
+});
+
+// 2. 많이 팔린 상품 TOP 5 (막대 그래프 - 파란색 계열)
+const top5Names = [{% for p in top5_products %}"{{ p.name }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+const top5Quantities = [{% for p in top5_products %}{{ p.quantity }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+const ctxBar = document.getElementById('top5BarChart').getContext('2d');
+new Chart(ctxBar, {
+    type: 'bar',
+    data: {
+        labels: top5Names,
+        datasets: [{
+            label: '판매 수량 (개)',
+            data: top5Quantities,
+            backgroundColor: [
+                '#38bdf8', // Cyan Blue
+                '#60a5fa', // Sky Blue
+                '#818cf8', // Indigo Blue
+                '#2563eb', // Royal Blue
+                '#3b82f6'  // Electric Blue
+            ],
+            borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+            y: { 
+                ticks: { color: '#94a3b8', stepSize: 1 }, 
+                grid: { color: 'rgba(51, 65, 85, 0.4)' } 
+            }
+        }
+    }
+});
+
+// 3. 주문 상태 비율 (도넛 그래프 - 파란색 & 조화로운 포인트)
+const statusLabels = ["대기", "완료", "취소"];
+const statusData = [
+    {{ status_counts['대기'] }},
+    {{ status_counts['완료'] }},
+    {{ status_counts['취소'] }}
+];
+
+const ctxDoughnut = document.getElementById('statusDoughnutChart').getContext('2d');
+new Chart(ctxDoughnut, {
+    type: 'doughnut',
+    data: {
+        labels: statusLabels,
+        datasets: [{
+            data: statusData,
+            backgroundColor: [
+                '#94a3b8', // 대기 (회색)
+                '#38bdf8', // 완료 (파란색 메인 포인트)
+                '#f43f5e'  // 취소 (포인트 레드)
+            ],
+            borderWidth: 2,
+            borderColor: '#1e293b'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { 
+                position: 'bottom',
+                labels: { color: '#f8fafc', padding: 15, font: { size: 13 } } 
+            }
+        },
+        cutout: '65%'
+    }
+});
+</script>
+{% endblock %}

@@ -147,8 +147,10 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments & Environment Secrets
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -156,6 +158,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.db
+*.sqlite
+*.sqlite3
+
 
 # Spyder project settings
 .spyderproject

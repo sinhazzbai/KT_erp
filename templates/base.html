@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}미니 ERP{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 사이드바 바 -->
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon"><i class="fa-solid fa-cubes"></i></div>
+            <span>미니 ERP</span>
+        </div>
+        <ul class="nav-list">
+            <li>
+                <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i> 대시보드
+                </a>
+            </li>
+            <li>
+                <a href="/customers" class="nav-link {% if active_page == 'customers' %}active{% endif %}">
+                    <i class="fa-solid fa-users"></i> 고객 관리
+                </a>
+            </li>
+            <li>
+                <a href="/products" class="nav-link {% if active_page == 'products' %}active{% endif %}">
+                    <i class="fa-solid fa-boxes-stacked"></i> 재고 관리
+                </a>
+            </li>
+            <li>
+                <a href="/orders" class="nav-link {% if active_page == 'orders' %}active{% endif %}">
+                    <i class="fa-solid fa-cart-shopping"></i> 주문 관리
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <div class="main-wrapper">
+        <header class="header">
+            <div class="header-title">{% block page_title %}대시보드{% endblock %}</div>
+            <div style="font-size:0.85rem; color: var(--text-secondary);">
+                FastAPI + MySQL Server
+            </div>
+        </header>
+
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

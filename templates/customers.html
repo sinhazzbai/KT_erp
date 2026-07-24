@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}고객 관리 - 미니 ERP{% endblock %}
+{% block page_title %}고객(Customers) 관리{% endblock %}
+
+{% block content %}
+
+<!-- 알림 메시지 영역 -->
+{% if error %}
+<div class="alert alert-danger">
+    <i class="fa-solid fa-triangle-exclamation"></i> <strong>오류:</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if msg %}
+<div class="alert alert-success">
+    <i class="fa-solid fa-circle-check"></i> {{ msg }}
+</div>
+{% endif %}
+
+<div class="section-grid">
+    <!-- 고객 목록 테이블 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-users"></i> 등록된 고객 목록</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th>연락처</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td>{{ customer.id }}</td>
+                        <td style="font-weight: 600; color: var(--text-primary);">{{ customer.name }}</td>
+                        <td>{{ customer.email }}</td>
+                        <td>{{ customer.phone or '-' }}</td>
+                        <td style="display: flex; gap: 0.4rem;">
+                            <button type="button" class="btn btn-primary btn-sm" 
+                                onclick="openEditModal({{ customer.id }}, '{{ customer.name }}', '{{ customer.email }}', '{{ customer.phone or '' }}')">
+                                <i class="fa-solid fa-pen-to-square"></i> 수정
+                            </button>
+
+                            <form action="/customers/{{ customer.id }}/delete" method="POST" style="display:inline;" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fa-solid fa-trash"></i> 삭제
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            등록된 고객 정보가 없습니다. 오른쪽 폼에서 신규 고객을 등록해보세요.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 신규 고객 등록 폼 -->
+    <div class="card">
+        <div class="card-title">
+            <span><i class="fa-solid fa-user-plus"></i> 신규 고객 등록</span>
+        </div>
+        <form action="/customers" method="POST">
+            <div class="form-group">
+                <label class="form-label">고객 이름 *</label>
+                <input type="text" name="name" class="form-control" placeholder="예: 홍길동" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">이메일 (중복 불가) *</label>
+                <input type="email" name="email" class="form-control" placeholder="example@domain.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">연락처</label>
+                <input type="text" name="phone" class="form-control" placeholder="010-1234-5678">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+                <i class="fa-solid fa-check"></i> 고객 등록
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 고객 정보 수정 모달 (팝업) -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-user-pen"></i> 고객 정보 수정</h3>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editForm" method="POST">
+            <div class="form-group">
+                <label class="form-label">고객 이름 *</label>
+                <input type="text" id="edit_name" name="name" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">이메일 (중복 불가) *</label>
+                <input type="email" id="edit_email" name="email" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">연락처</label>
+                <input type="text" id="edit_phone" name="phone" class="form-control">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+                <button type="button" class="btn" style="background: var(--border-color);" onclick="closeEditModal()">취소</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, name, email, phone) {
+    document.getElementById('editForm').action = '/customers/' + id + '/edit';
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_email').value = email;
+    document.getElementById('edit_phone').value = phone;
+    document.getElementById('editModal').classList.add('active');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+}
+</script>
+{% endblock %}
